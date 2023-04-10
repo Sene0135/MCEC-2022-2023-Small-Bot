@@ -1,23 +1,41 @@
 #include "main.h"
 #include <string>
+#include <vector>
 #define startingv 50
 // test2
 // function headers
-void moveToPos1();
+void moveToPos1(); //Moves to big bot 
 void lookForBig();
 void grabDisk();
 void lookForDisks();
 
-pros::Controller master(pros::E_CONTROLLER_MASTER);
-pros::Motor topleft(3, false);
-pros::Motor topright(7, false);
-pros::Motor bottleft(2, true);
-pros::Motor bottright(1, true);
-pros::Motor roller(13, false);
-pros::Vision vision_sensor(16);
-pros::Distance dist_sensor(8);
+#define maxfly 170 //Shoot from one low goal to the other
+#define smallfly 135 //shoot high goal right outside net
+#define midfly 145
 
-bool rollerbool = false;
+//seperate belt and wheel intake
+//lower speed of flywheel by mucho
+
+
+pros::Controller master(pros::E_CONTROLLER_MASTER);
+pros::Motor topleft(16, false);
+pros::Motor spring(1, false);
+pros::Motor topright(17, true);
+pros::Motor bottleft(15, true);
+pros::Motor bottright(18, false);
+pros::Motor flywheel(13, true);
+pros::Motor intake(20, false);
+pros::Motor belt(10, true);
+pros::Motor roller(2, false);
+pros::Vision vision_sensor(18);
+pros::Distance dist_sensor(16);
+
+
+//pros::Motor_Group Left ({3, 1});
+//pros::Motor_Group Right ({7,2});
+//pros::Motor_Group Total ({1,2,-3,-7});
+
+bool rollerbool = false;	
 bool distancetrue = false; // for checking if distance sensor glitch yaaaaa
 bool lookFoDisk = false;
 int distance = 700;
@@ -25,122 +43,101 @@ int diskCheckVelocity = 20;
 int vision = 0;
 int ymotion;
 int xmotion;
+int flywheelV = smallfly;
 
 void initialize() {
-
+   spring.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
   pros::lcd::initialize();
-  pros::lcd::set_text(1, "Habibi");
-  pros::lcd::set_text(2, "Analog Sticks to Drive");
-  pros::lcd::set_text(3, "L1 - Slow down on turns");
-  pros::lcd::set_text(4, "R1 - Rollers");
+ // pros::lcd::set_text(1, "real");
+ // pros::lcd::set_text(2, "Analog Sticks to Drive");
+  //pros::lcd::set_text(3, "L1 - Slow down on turns");
+ // pros::lcd::set_text(4, "R1 - Rollers");
   pros::delay(1);
 }
 
-void moveToPos1() {
-  topleft.move_absolute(7, startingv);
-  bottleft.move_absolute(7, startingv);
-  bottright.move_absolute(7, startingv);
-  topright.move_absolute(7, startingv);
-  pros::delay(200);
-  topleft.move_velocity(0);
-  bottleft.move_velocity(0);
-  bottright.move_velocity(0);
-  topright.move_velocity(0);
 
-  lookFoDisk = true;
-}
-void lookForBig() {
-  // use the vision sensor to look for red.
-}
-void grabDisk() {
-  // first, the bot needs to find the center of the disk, and then do the
-  // grabbin and stuff, foreplay ya feel?
-
-  // use this while loop to find the center of the disk
-  while (true) {
-    distance = dist_sensor.get();
-    topleft.move_velocity(-diskCheckVelocity);
-    bottright.move_velocity(diskCheckVelocity);
-    if (distance >
-        200) { // since it stops 15 cm before the desired disk, 5cm room for
-               // error(considering disk curvature) should be enough
-      pros::delay(50);
-      topleft.move_velocity(0);
-      bottright.move_velocity(0);
-      pros::delay(30);
-      topleft.move_velocity(diskCheckVelocity);
-      bottright.move_velocity(-diskCheckVelocity);
-    } 
-    else if (distance <= 200) {
-      
-    }
-  }
-}
-
-void lookForDisks() {
-
-  while (lookFoDisk == true) {
-    distance = dist_sensor.get();
-
-    // check the ports, I think some of the motors arent moving in the right way
-    // spins the bot to check for disks
-    topleft.move_velocity(-diskCheckVelocity);
-    bottright.move_velocity(diskCheckVelocity);
-    //MAKE TIMER GOOOOOOOFY AHH
-
-    // This command tells the sensor to return whether it has detected the disc
-    // or not (or something yellow) returns 255 if not detecting, 1 if it
-    // detects
-    pros::vision_object_s_t color = vision_sensor.get_by_sig(0, 1);
-
-    pros::lcd::set_text(6, "Detected?: " + std::to_string(color.signature));
-    vision = color.signature;
-    pros::delay(20);
-
-    // for the millisecond error
-    if (distance < 500) {
-      pros::delay(1000);
-      if (distance < 500) {
-        distancetrue = true;
-      } else {
-        distancetrue = false;
-      }
-    }
-
-    // if the distance is under 500 for over a second and the vision sensor has
-    // detected something yellow, break loop
-    if (distancetrue == true &&
-        vision == 1) { // gonna want to add size requirements for accuracy
-      pros::lcd::set_text(2, "detected ");
-      pros::delay(2);
-      break;
-    }
-  }
-
-  // stop motors
-  pros::lcd::set_text(3, "Stopped ");
-  topleft.move_velocity(
-      0); // tells which motor to move at what voltage/direction
-  bottleft.move_velocity(0);
-  bottright.move_velocity(0);
-  topright.move_velocity(0);
-  pros::delay(2);
-}
 void autonomous() {
-  // want the bot to go to a preset location, look for the yellow disks, after
-  // picking them up, turns around and looks at the general area where the big
-  // bot will be, it will look for the color red. the challenge is to time both
-  // bots so they do not collide with eachother. a solution for this is to have
-  // a similar system with the big bot, attach a vision sensor, and have it pick
-  // up disks a couple sencds after it sees them, not the best solution....but
-  // its all I got so fuckin deal w it bitch
+  //Keep it simple
+  //Move forward, turn to the left (where lower goal is)
+  //Shoot preloads into lower goal
+  //ez ez points yippee
+  //go to adjacent roller
+  topleft.tare_position();
+  topright.tare_position();
+  bottleft.tare_position();
+  bottright.tare_position();
+/*
+  topleft.move_absolute(-454, 100); //Turn 45 deg (position values gained from opcontrol driving)
+  topright.move_absolute(286, 100);
+  bottleft.move_absolute(1704, 100);
+  bottright.move_absolute(-1575, 100);
+  while (!((bottleft.get_position() < 1710) && (bottleft.get_position() > 1700))) {
+      pros::lcd::set_text(1, std::to_string(topleft.get_position()));
+      pros::lcd::set_text(2, std::to_string(topright.get_position()));
+      pros::lcd::set_text(3, std::to_string(bottleft.get_position()));
+      pros::lcd::set_text(4, std::to_string(bottright.get_position()));
+    // Continue running this loop as long as the motor is not within +-5 units of its goal
+    pros::delay(2);
+  }
+  pros::lcd::set_text(5, "OVER!");
+  topleft.tare_position();
+  topright.tare_position();
+  bottleft.tare_position();
+  bottright.tare_position();
+  pros::delay(1000);
+  topleft.move_absolute(-2676, 100); //Drive straight towards disc
+  topright.move_absolute(-1738, 100);
+  bottleft.move_absolute(9657, 100);
+  bottright.move_absolute(10456, 100);
+  while (!((bottright.get_position() < 10460) && (bottright.get_position() > 10450))) {
+    // Continue running this loop as long as the motor is not within +-5 units of its goal
+    pros::delay(2);
+    pros::lcd::set_text(1, std::to_string(topleft.get_position()));
+      pros::lcd::set_text(2, std::to_string(topright.get_position()));
+      pros::lcd::set_text(3, std::to_string(bottleft.get_position()));
+      pros::lcd::set_text(4, std::to_string(bottright.get_position()));
+  }
 
-  // move to preset location:
-  moveToPos1(); // stop 15 cm before the expected disk location
-  lookForDisks();
-  grabDisk();
-  lookForBig();
+  topleft.move_absolute(215, 100); //Drive straight towards disc
+  topright.move_absolute(250, 100);
+  bottleft.move_absolute(-149, 100);
+  bottright.move_absolute(-176, 100);
+  pros::delay(1000);
+*/
+
+  flywheel.move_velocity(90);
+  while(flywheel.get_actual_velocity() < 90) {
+    pros::delay(2);
+  }
+  int timervar = 0;
+  while(timervar != 5000) {
+    flywheel.move_velocity(120);
+    intake.move_velocity(200);
+    belt.move_velocity(120);
+    pros::delay(1);
+    timervar++;
+  }
+   flywheel.move_velocity(0);
+    intake.move_velocity(0);
+    belt.move_velocity(0);
+  pros::delay(1);
+
+	topleft.move_absolute(1438, 20); //Drive straight towards disc
+  topright.move_absolute(1561, 20);
+  bottleft.move_absolute(-1135, 20);
+  bottright.move_absolute(-1194, 20);
+    pros::delay(1700);
+
+topleft.move_absolute(43, 20); //Drive straight towards disc
+  topright.move_absolute(-804, 20);
+  bottleft.move_absolute(-71, 20);
+  bottright.move_absolute(597, 20);
+  pros::delay(1000);
+
+
 }
+
+  
 
 void opcontrol() {
 
@@ -148,11 +145,16 @@ void opcontrol() {
   // idk how to do it but I have ideas, lez finish auton forst bb
   while (true) {
 
-    pros::Controller master(pros::E_CONTROLLER_MASTER);
+      pros::lcd::set_text(1, std::to_string(topleft.get_position()));
+      pros::lcd::set_text(2, std::to_string(topright.get_position()));
+      pros::lcd::set_text(3, std::to_string(bottleft.get_position()));
+      pros::lcd::set_text(4, std::to_string(bottright.get_position()));
 
+    pros::Controller master(pros::E_CONTROLLER_MASTER);
+    //master.print(0, 0, "ur ass lol");
     // default movement control
-    ymotion = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-    xmotion = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+    ymotion = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+    xmotion = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 
     int right = -xmotion + ymotion; //-power + turn
     int left = xmotion + ymotion;   // power + turn
@@ -161,224 +163,134 @@ void opcontrol() {
     bottleft.move(-left);
     bottright.move(right);
     topright.move(-right);
-    pros::delay(1);
 
-    ////
 
-    // Runs rollers motors while holding R1
 
-    if (master.get_digital(DIGITAL_R1)) { // rollers
-
-      roller.move_velocity(120);
-
-    } else {
-
-      roller.move_velocity(0);
-    }
-
-    // Slowdown feature (Cuts robots speed in half while holding down L1 on
-    // controller)
-    if (master.get_digital(DIGITAL_L1)) {
-
-      int right = (-xmotion + ymotion) / 2; //-power + turn
-      int left = (xmotion + ymotion) / 2;   // power + turn
+    if(ymotion < -1 || ymotion > 1) { //slows down turning speed  by 1.75
+      int right = (-xmotion + ymotion) / 1.75; //-power + turn
+      int left = (xmotion + ymotion) / 1.75;   // power + turn
 
       topleft.move(left);
       bottleft.move(-left);
       bottright.move(right);
       topright.move(-right);
     }
-  }
-}
-ROLLER_MASTER);
-	pros::Motor topleft(3, false);
-	pros::Motor topright(7, false);	
-	pros::Motor bottleft(2, true);
-	pros::Motor bottright(1, true);
-	pros::Motor roller(13, false);
-	pros::Vision vision_sensor(16);
-	pros::Distance dist_sensor (8);
+   
+    ////
 
+    // Runs rollers motors while holding R1
+      if(master.get_digital(DIGITAL_UP)) {
+      pros::lcd::set_text(6, std::to_string(flywheelV));
+  
 
-	bool rollerbool = false;
-	int distance = 700;
-	bool distancetrue = false;
-	int vision = 255;
-	int ymotion;
-	int xmotion;
+		if (flywheelV == midfly) {
+      pros::delay(100);
+			flywheelV = maxfly;
+			 master.print(0, 0, "far      ");
+      
+  
+		}
 
-void grabDisk() { 
-	distance = dist_sensor.get();
-	//logic could be improved, basically it just has the bot drive towards the disc at a diff speed until its in the scoop
-	while (distance > 25) { //drive into the disc until the disc is under 25mm from the dist sensor
-	distance = dist_sensor.get();
-	topleft.move_velocity(approachingv); //tells which motor to move at what voltage/direction
-	bottleft.move_velocity(approachingv);
-	bottright.move_velocity(approachingv);
-	topright.move_velocity(approachingv);
-	pros::delay(2);
-	if (distance < 25) {
-		break;
-	}
-	}
-	
-	//stops bot for a sec
-	topleft.move_velocity(0); //tells which motor to move at what voltage/direction
-	bottleft.move_velocity(0);
-	bottright.move_velocity(0);
-	topright.move_velocity(0);
+		else if (flywheelV == smallfly) {
+       pros::delay(100);
+			flywheelV = midfly;
+			 master.print(0, 0, "medium");
+     
+      
+		}
+     pros::delay(100);
 
-	//makes bot turn with the disc in the scoop
-	pros::delay(1000);
-	//topleft.move_velocity(approachingv); //replace w/ encoder movement
-	bottleft.move_velocity(approachingv);
-	//bottright.move_velocity(approachingv);
-	topright.move_velocity(-approachingv);
-	pros::delay(5000);
+		}
 
-	//stops here
-	topleft.move_velocity(0); //replace w/ encoder movement
-	bottleft.move_velocity(0);
-	bottright.move_velocity(0);
-	topright.move_velocity(0);
-	pros::lcd::set_text(4, "JOB DONE! ");
-
-
-	}
-
-void initialize(){
-
-	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Habibi");
-	//pros::lcd::set_text(2, "Analog Sticks to Drive");
-	//pros::lcd::set_text(3, "L1 - Slow down on turns");
-	//pros::lcd::set_text(4, "R1 - Rollers");
-	pros::delay(1);
-
-}
-
-void autonomous() {
-
-	/*
-	topleft.move_velocity(startingv); //tells which motor to move at what voltage/direction
-	bottleft.move_velocity(startingv);
-	bottright.move_velocity(startingv);
-	topright.move_velocity(startingv);
-	pros::delay(2000);
-	*/
-	
-
-	//Checking for disk
-  	while (true)   {
-	distance = dist_sensor.get();
-	
-	//check the ports, I think some of the motors arent moving in the right way
-	topleft.move_velocity(startingv); //tells which motor to move at what voltage/direction
-	bottleft.move_velocity(startingv);
-	bottright.move_velocity(startingv);
-	topright.move_velocity(-startingv);//test
-	
-
-	//This command tells the sensor to return whether it has detected the disc or not (or something yellow)
-	//returns 255 if not detecting, 1 if it detects
-    pros::vision_object_s_t color = vision_sensor.get_by_sig(0, 1);
-
-	pros::lcd::set_text(6, "Detected?: " + std::to_string(color.signature));
-	vision = color.signature;
-	pros::delay(2);
-
-	//the distance sensor keeps thinking somethings in front of it for a millisecond (you can see this in devices)
-	//I wrote some code to ideally check if the distance is under 500 for over a second, and if not then ignore the reading
-	//not sure if this logic works entirely, worth testing more
-	if (distance < 500) {
-
-		pros::delay(1000);
-		if (distance < 500) {
-			distancetrue = true;
-		} else { distancetrue = false;}
+	if(master.get_digital(DIGITAL_DOWN)) {
+    pros::lcd::set_text(6, std::to_string(flywheelV));
 		
+		if (flywheelV == maxfly) {
+			pros::delay(100);
+			flywheelV = midfly;
+			 master.print(0, 0, "medium");
+	
+			
+
+		} 
+
+		else if (flywheelV == midfly) {
+			pros::delay(100);
+			flywheelV = smallfly;
+			master.print(0, 0, "close   ");
+			 
+   
+		}
 
 	}
 
-    //if the distance is under 500 for over a second and the vision sensor has detected something yellow, break loop
-	if (distancetrue == true && vision == 1)	{ //gonna want to add size requirements for accuracy
-		 pros::lcd::set_text(2, "detected ");
-		 pros::delay(2);	
-		  break;
-		 }
+    if (master.get_digital(DIGITAL_R1)) { // intake
 
-	}
+      intake.move_velocity(200);
+      belt.move_velocity(120);
 
-	//stop motors
-	pros::lcd::set_text(3, "Stopped ");
-	topleft.move_velocity(0); //tells which motor to move at what voltage/direction
-	bottleft.move_velocity(0);
-	bottright.move_velocity(0);
-	topright.move_velocity(0);
-	pros::delay(2);
-	grabDisk();	//run function to go grab the disc
+    } else {
+      belt.move_velocity(0);
+      intake.move_velocity(0);
+    }
+    
+    if (master.get_digital(DIGITAL_L1)) { // intake seperate
+
+      intake.move_velocity(200);
+
+    } 
+
+    if (master.get_digital(DIGITAL_Y)) { // belt seperate
+
+      belt.move_velocity(200);
+
+    } 
+
+    if (master.get_digital(DIGITAL_L2)) { // belt/flywheel reverse in case of jam
+
+      belt.move_velocity(-200);
+
+    } 
+
+ 
+
+    if (master.get_digital(DIGITAL_A)) { //releases string shooter
+
+     spring.move_relative(-100,100);
+
+    }
 
 
-}
 
-
-
-
-
-
-
-
-
-
-
-
-void opcontrol() {
 	
 
-	while (true) {
+    // Slowdown feature (Cuts robots speed in half while holding down L1 on
+    // controller)
 
-	pros::Controller master(pros::E_CONTROLLER_MASTER);
+    if(master.get_digital(DIGITAL_R2)) { //flywheel
+		
+		flywheel.move_velocity(flywheelV);
+    pros::lcd::set_text(5, std::to_string(flywheel.get_actual_velocity()));
+    pros::lcd::set_text(6, std::to_string(flywheelV));
+    pros::delay(10);
 
-	// default movement control
-	ymotion = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-	xmotion = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
-
-	int right = -xmotion + ymotion; //-power + turn
-	int left = xmotion + ymotion; //power + turn
-
-	topleft.move(left); //tells which motor to move at what voltage/direction
-	bottleft.move(-left);
-	bottright.move(right);
-	topright.move(-right);
-	pros::delay(1);
-
-	////
-
-		//Runs rollers motors while holding R1 
-		if(master.get_digital(DIGITAL_R1)){ //rollers
-
-			roller.move_velocity(120);
 
 		} else {
-
-			roller.move_velocity(0);
-		}
-	
-		// Slowdown feature (Cuts robots speed in half while holding down L1 on controller)
-		if(master.get_digital(DIGITAL_L1)) { 
-
-			int right = (-xmotion + ymotion)/2; //-power + turn
-			int left = (xmotion + ymotion)/2; //power + turn
-
-			topleft.move(left);
-			bottleft.move(-left);
-			bottright.move(right);
-			topright.move(-right);
-
+			flywheel.move_velocity(0);
 		}
 
-	}
 
+     if (master.get_digital(DIGITAL_B)) { // roller
+
+      roller.move_velocity(400);
+
+
+    } else {
+      roller.move_velocity(0);
+    }
+    
+
+  pros::delay(1);
+
+  }
 }
-
-
